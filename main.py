@@ -5,6 +5,7 @@ from discord import FFmpegPCMAudio, PCMVolumeTransformer
 
 import os
 from random import choice
+import math
 
 # import discord python library
 import discord
@@ -122,5 +123,25 @@ async def play(ctx):
     source = create_audio_source(song)
     vc.play(source)
     await ctx.send(f'Now Playing: {song}')
+
+@bot.command(name = 'source')
+async def source(ctx):
+    # read in the source file
+    f = open('main.py','r')
+    contents = f.read()
+    f.close()
+
+    # initialize a list of content to send
+    contentList = []
+
+    # cut the sourcecode into manageable sized chunks
+    for i in range(math.ceil(len(contents)/1900)):
+        contentList.append(contents[:1900])
+        contents = contents[1900:]
+
+    # send each chunk in it's own message
+    for chunk in contentList:
+        # these kimda jackup the formatting, which is a little funny.
+        await ctx.send('```' + chunk + '```')
 
 bot.run(token)
