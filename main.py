@@ -2,11 +2,12 @@
 from settings import *
 # get audio utilities specifically
 from discord import FFmpegPCMAudio, PCMVolumeTransformer
-
+# get os for filesystem navigation
 import os
+# get the random.choice function
 from random import choice
+# import the math library
 import math
-
 # import discord python library
 import discord
 # import the command module
@@ -18,23 +19,39 @@ ffmpeg_path = ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 # Remind console user of the prefix
 print(f'Attempting to launch Bot using {prefix} as the command prefix.')
 
-# Song List
-print('Initializing Song Library')
-songs = []
-for r, d, f in os.walk('music'):
-    for file in f:
-        if ".mp3" in file or ".wma" in file:
-            songs.append(os.path.join(r, file))
-print('Song Library Initialized')
-
-#voiceClient Dictionary
+# voiceClient Dictionary
 voiceClientDictionary = {}
 
-#initialize discord client
+# initialize discord client
 bot = discord.Client()
 
-#set command prefix
+# set command prefix
 bot = commands.Bot(command_prefix=prefix)
+
+# class for songs
+class Song:
+    # constructor, also sets path
+    def __init__(self,_artist,_album,_title):
+        self.artist = _artist
+        self.album = _album
+        self.title = _title
+        self.path = f'music/{self.artist}/{self.album}/{self.title}'
+    
+    # display method, returns string
+    def displayTitle(self):
+       return f'Now playing:\n{self.title}\nby -> {self.artist}\non the album -> {self.album}'
+
+# loop through the directory stuctures and make songs.
+def populateSongList():
+    songList = []
+    for artist in os.listdir('music'):
+        if os.path.isdir(f'music/{artist}'):
+            for album in os.listdir(f'music/{artist}'):
+                if os.path.isdir(f'music/{artist}/{album}'):
+                    for f in os.listdir(f'music/{artist}/{album}'):
+                        if ".mp3" in f or ".wma" in f:
+                            songList.append(Song(artist, album, f))
+    return songList
 
 # use this function for creating an audioSource from an mp3 file
 # from https://github.com/elibroftw/discord-bot/blob/master/bot.py
@@ -47,6 +64,11 @@ def create_audio_source(music_filepath,start_at=0.0):
 # choose a song at random
 def random_song():
     return choice(songs)
+
+# Song List
+print('Initializing Song Library')
+songs = populateSongList()
+print('Song Library Initialized')
 
 # if the bot is ready print that out.
 @bot.event
@@ -120,9 +142,10 @@ async def play(ctx):
         vc.stop()
     # pick a random song and play it.
     song = random_song()    
-    source = create_audio_source(song)
+    source = create_audio_source(song.path)
     vc.play(source)
-    await ctx.send(f'Now Playing: {song}')
+    # await ctx.send(f'Now Playing: {song.title}')
+    await ctx.send(song.displayTitle())
 
 @bot.command(name = 'source')
 async def source(ctx):
