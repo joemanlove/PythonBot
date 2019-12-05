@@ -13,14 +13,19 @@ import discord
 # import the command module
 from discord.ext import commands
 
+import asyncio
+
 # set the filepath for the audio decoder
-ffmpeg_path = ffmpeg_path = 'ffmpeg/bin/ffmpeg'
+ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 
 # Remind console user of the prefix
 print(f'Attempting to launch Bot using {prefix} as the command prefix.')
 
 # voiceClient Dictionary
 voiceClientDictionary = {}
+
+# play on loop Dictionary
+autoPlayDictionary = {}
 
 # initialize discord client
 bot = discord.Client()
@@ -51,6 +56,8 @@ def populateSongList():
                     for f in os.listdir(f'music/{artist}/{album}'):
                         if ".mp3" in f or ".wma" in f:
                             songList.append(Song(artist, album, f))
+    if songList == []:
+        print('Warning empty Song Library.\n Check your file structure and terminal directory.')
     return songList
 
 # use this function for creating an audioSource from an mp3 file
@@ -68,25 +75,30 @@ def random_song():
 # Song List
 print('Initializing Song Library')
 songs = populateSongList()
-print('Song Library Initialized')
+print(f'Song Library Initialized with {len(songs)} items.')
 
 # if the bot is ready print that out.
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    bot.loop.create_task(status_task())
+
+
+
 
 # ping command for testing purposes
 @bot.command(name = 'ping')
 async def ping(ctx):
     await ctx.send('Pong!')
 
-# join command to summon the bot to the voicechannel the user is in
-@bot.command(name = 'join')
-async def join(ctx):
+async def setUpVoiceClient(ctx):
     # set vc to the voiceclient out of the dictionary, if there isn't one this will be 'none'
     vc = voiceClientDictionary.get(ctx.guild.id)
     # set channel to the author's voice channel, also possibly 'none'
-    channel = ctx.author.voice.channel
+    if ctx.author.voice:
+        channel = ctx.author.voice.channel
+    else:
+        channel = False
     # if the author is not in a VC
     if not channel:
         # send an error and return
@@ -105,6 +117,12 @@ async def join(ctx):
     return vc
 
 
+# join command to summon the bot to the voicechannel the user is in
+@bot.command(name = 'join')
+async def join(ctx):
+    await setUpVoiceClient(ctx)
+
+
 # disconnect command
 @bot.command(name = 'leave', aliases = ['disconnect','go','goaway'])
 async def leave(ctx):
@@ -121,23 +139,9 @@ async def leave(ctx):
 # play an audioSource
 @bot.command(name = 'play')
 async def play(ctx):
-    # set vc to the voiceclient out of the dictionary, if there isn't one this will be 'none'
-    vc = voiceClientDictionary.get(ctx.guild.id)
-    # get the voice channel the author is in, this can be 'none'
-    channel = ctx.author.voice.channel
-    # if the author isn't in a channel, error out and return
-    if not channel:
-        await ctx.send('You\'re not in a voice channel.')
-        return
-    # if there isn't a vc, make one and add it to the dict.
-    if not vc:
-        vc = await channel.connect()
-        voiceClientDictionary[ctx.guild.id] = vc
-        await ctx.send('Ready')
-    # if the user isn't in the channel with the bot, move the bot.
-    if vc.channel != channel:
-        await vc.move_to(channel)
-    # if there's already audio playing stop it
+    # get a voiceClient up and running or fetch the existing one
+    vc = await setUpVoiceClient(ctx)
+    
     if vc.is_playing():
         vc.stop()
     # pick a random song and play it.
@@ -146,6 +150,19 @@ async def play(ctx):
     vc.play(source)
     # await ctx.send(f'Now Playing: {song.title}')
     await ctx.send(song.displayTitle())
+
+def playRandomSong(vc):
+    song = random_song()    
+    source = create_audio_source(song.path)
+    vc.play(source)
+    return song.displayTitle()
+
+@bot.command(name = 'autoplay')
+async def autoplay(ctx):
+    # get a voiceClient up and running or fetch the existing one
+    vc = await setUpVoiceClient(ctx)
+    autoPlayDictionary[ctx.guild.id] = True
+    
 
 @bot.command(name = 'source')
 async def source(ctx):
@@ -166,5 +183,23 @@ async def source(ctx):
     for chunk in contentList:
         # these kimda jackup the formatting, which is a little funny.
         await ctx.send('```' + chunk + '```')
+
+async def status_task():
+    while True:
+        for guildId in voiceClientDictionary.keys():
+            # print(guildId)
+            # extend the voiceClient instead, this is silly.
+            vc = voiceClientDictionary.get(guildId)
+            if autoPlayDictionary.get(guildId) and vc:
+                if not vc.is_playing():
+                    st = playRandomSong(vc)
+                    print(st)
+                
+        await asyncio.sleep(10)
+        # print('1')
+        # await asyncio.sleep(10)
+        # print('2')
+        # await asyncio.sleep(10)
+
 
 bot.run(token)
