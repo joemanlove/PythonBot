@@ -33,6 +33,15 @@ bot = discord.Client()
 # set command prefix
 bot = commands.Bot(command_prefix=prefix)
 
+# extend the VoiceClient class to include some more attributes
+class extendedVoiceClient(discord.VoiceClient):
+    def setTextChannel(self, channel):
+        self.textChannel = channel
+
+    def setAutoPlay(self, boolean):
+        self.autoPlay = boolean
+
+
 # class for songs
 class Song:
     # constructor, also sets path
@@ -114,6 +123,10 @@ async def setUpVoiceClient(ctx):
     # if the user isn't in the channel that the bot is, move the bot.
     elif vc.channel != channel:
         await vc.move_to(channel)
+    # typecast the VoiceClient into an extendedVoiceClient    
+    vc.__class__ = extendedVoiceClient
+    vc.setTextChannel(ctx.channel)
+    vc.setAutoPlay(False)
     return vc
 
 
@@ -141,14 +154,12 @@ async def leave(ctx):
 async def play(ctx):
     # get a voiceClient up and running or fetch the existing one
     vc = await setUpVoiceClient(ctx)
-    
     if vc.is_playing():
         vc.stop()
     # pick a random song and play it.
     song = random_song()    
     source = create_audio_source(song.path)
     vc.play(source)
-    # await ctx.send(f'Now Playing: {song.title}')
     await ctx.send(song.displayTitle())
 
 def playRandomSong(vc):
@@ -161,7 +172,7 @@ def playRandomSong(vc):
 async def autoplay(ctx):
     # get a voiceClient up and running or fetch the existing one
     vc = await setUpVoiceClient(ctx)
-    autoPlayDictionary[ctx.guild.id] = True
+    vc.setAutoPlay(True)
     
 
 @bot.command(name = 'source')
@@ -184,22 +195,17 @@ async def source(ctx):
         # these kimda jackup the formatting, which is a little funny.
         await ctx.send('```' + chunk + '```')
 
+# timer code from https://stackoverflow.com/questions/46267705/making-a-discord-bot-change-playing-status-every-10-seconds
 async def status_task():
     while True:
         for guildId in voiceClientDictionary.keys():
-            # print(guildId)
-            # extend the voiceClient instead, this is silly.
             vc = voiceClientDictionary.get(guildId)
-            if autoPlayDictionary.get(guildId) and vc:
+            if vc.autoPlay:
                 if not vc.is_playing():
                     st = playRandomSong(vc)
-                    print(st)
+                    await vc.textChannel.send(st)
                 
         await asyncio.sleep(10)
-        # print('1')
-        # await asyncio.sleep(10)
-        # print('2')
-        # await asyncio.sleep(10)
 
 
 bot.run(token)
