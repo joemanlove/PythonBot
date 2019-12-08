@@ -1,15 +1,22 @@
+# get os for filesystem navigation
+import os
 
+# get audio utilities specifically
+from discord import FFmpegPCMAudio, PCMVolumeTransformer
+# set filepath for decoder
+ffmpeg_path = 'ffmpeg/bin/ffmpeg'
 
 class Song:
+    # constructor, also sets path
     def __init__(self,_artist,_album,_title):
         self.artist = _artist
         self.album = _album
         self.title = _title
+        self.path = f'music/{self.artist}/{self.album}/{self.title}'
     
+    # display method, returns string
     def displayTitle(self):
-        print(f'Now playing:\n{self.title}\nby -> {self.artist}\non the album -> {self.album}')
-
-
+       return f'Now playing:\n{self.title}\nby -> {self.artist}\non the album -> {self.album}'
 
 def populateSongList():
     songList = []
@@ -20,6 +27,8 @@ def populateSongList():
                     for f in os.listdir(f'music/{artist}/{album}'):
                         if ".mp3" in f or ".wma" in f:
                             songList.append(Song(artist, album, f))
+    if songList == []:
+        print('Warning empty Song Library.\n Check your file structure and terminal directory.')
     return songList
 
 # use this function for creating an audioSource from an mp3 file
@@ -29,7 +38,3 @@ def create_audio_source(music_filepath,start_at=0.0):
     audio_source = PCMVolumeTransformer(audio_source)
     #audio_source.volume = guild_data['volume']
     return audio_source
-
-# choose a song at random
-def random_song():
-    return choice(songs)
